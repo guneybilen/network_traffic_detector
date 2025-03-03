@@ -109,7 +109,7 @@ Thread.new do
           # Log outgoing traffic
           hostname = resolve_hostname(ip_dst)
           outgoing_destinations[ip_dst] = hostname
-          html_output("Outgoing traffic to: #{hostname} (#{ip_dst})", :blue)
+          # html_output("Outgoing traffic to: #{hostname} (#{ip_dst})", :blue)
         end
 
         # Check incoming traffic
@@ -117,17 +117,17 @@ Thread.new do
           # Check if the incoming traffic originates from known outgoing destinations
           if outgoing_destinations.key?(ip_src)
             hostname = resolve_hostname(ip_src)
-            html_output("Incoming traffic from: #{hostname} (#{ip_src})", :green)
+            #html_output("Incoming traffic from: #{hostname} (#{ip_src})", :green)
           elsif ip_src == '192.168.1.23'
-            html_output("Incoming traffic from host address: #{ip_src}", :green)
+            #html_output("Incoming traffic from host address: #{ip_src}", :green)
           elsif ip_src == router_address
-            html_output("Incoming traffic from router address: #{ip_src}", :green)
+            #html_output("Incoming traffic from router address: #{ip_src}", :green)
           else
             if hostname.nil?
               hostname = resolve_hostname(ip_src)
               html_output("Unknown incoming traffic from: #{ip_src}", :red)
             else
-              html_output("Incoming traffic from: #{hostname} (#{ip_src})", :blue)
+              #html_output("Incoming traffic from: #{hostname} (#{ip_src})", :blue)
             end
           end
         end
