@@ -1,0 +1,70 @@
+# Ignore bundler config
+/.bundle
+
+# Ignore the default SQLite database.
+*.sqlite3
+*.sqlite3-journal
+
+# Ignore all logfiles and tempfiles.
+log/*
+tmp/*
+!/log/.keep
+!/tmp/.keep
+
+# Ignore other unneeded files.
+*.rbc
+*.sassc
+.sass-cache
+.rspec
+/.rspec
+/.yardoc
+/_yardoc/
+/coverage/
+/InstalledFiles
+/pkg/
+/spec/reports/
+/spec/examples.txt
+/test/tmp/
+/test/version_tmp/
+/tmp/
+
+# Ignore Byebug command history file.
+.byebug_history
+
+# Ignore dotenv environment variables file.
+.env
+
+# Ignore macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Directories potentially created on remote AFP share
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Ignore RubyMotion files
+.dat*
+.repl_history
+build/
+*.bridgesupport
+build-iPhoneOS/
+build-iPhoneSimulator/
+
+# Ignore RubyMotion (use of CocoaPods)
+Pods/
