@@ -47,9 +47,9 @@ def resolve_hostname(ip_address)
   when "8.8.8.8", "8.8.4.4"
     "Google DNS"
   when "192.168.1.1"
-    "inseego router address"
-  when "192.168.1.23"
-    "Mac Book Pro 3"
+    "router address"
+  when get_ip_address
+    "Host running the code"
   else
     begin
       Resolv.getname(ip_address)
