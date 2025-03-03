@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A page displaying dynamically generated colored output.">
+  <meta name="keywords" content="HTML, CSS, JavaScript, Ruby, Packet Capture">
+  <meta name="author" content="Guney Bilen">
+  <title>Network Traffic Output</title>
+  <style>
+    :root {
+      --font-size: 16px;
+    }
+    #content {
+      height: 90vh;
+      overflow-y: scroll;
+    }
+  </style>
+  <script>
+    // Fetch new content every second
+    setInterval(() => {
+      fetch('content.html')
+        .then(response => response.text())
+        .then(data => {
+          // Clear and reload the content
+          const contentDiv = document.getElementById('content');
+          contentDiv.innerHTML = data;
+
+          // Scroll to the bottom of the content div
+          contentDiv.scrollTop = contentDiv.scrollHeight;
+        });
+    }, 1000); // Refresh every second
+  </script>
+</head>
+<body>
+  <div id='content'></div>
+</body>
+</html>
