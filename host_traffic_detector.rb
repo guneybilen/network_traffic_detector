@@ -69,13 +69,6 @@ outgoing_destinations = {}
 # Router address
 router_address = '192.168.1.1'
 
-# Signal handler to clear content.html on Ctrl+C
-Signal.trap("INT") do
-    File.open('content.html', 'w') { |file| file.truncate(0) }
-    puts "\nCleared content.html"
-    exit
-end
-
 # Start the WEBrick server
 server = WEBrick::HTTPServer.new(
   Port: 8000,
@@ -151,7 +144,13 @@ Thread.new do
   end
 end
 
-trap('INT') { server.shutdown }
+# Signal handler to clear content.html on Ctrl+C
+Signal.trap("INT") do
+  File.open('content.html', 'w') { |file| file.truncate(0) }
+  puts "\nCleared content.html"
+  server.shutdown
+  exit
+end
   
 puts 'Starting server on http://localhost:8000'
 server.start
