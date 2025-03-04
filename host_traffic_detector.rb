@@ -2,6 +2,9 @@ require 'packetgen'
 require 'resolv'
 require 'socket'
 require 'webrick'
+require 'json'
+require 'base64'
+require 'open3'
 
 
 def html_output(txt_output, txt_color)
@@ -54,8 +57,7 @@ def resolve_hostname(ip_address)
     begin
       Resolv.getname(ip_address)
     rescue StandardError => e
-      html_output("Error in resolve_hostname #{e}", :red)
-      "No Hostname"
+      return nil
     end
   end
 end
@@ -95,12 +97,122 @@ end
 # Mount the root directory with the custom CORS handler
 server.mount('/', CORSHandler, Dir.pwd)
 
+# Mapping of protocol numbers to protocol names
+protocol_names = {
+  1 => 'ICMP',
+  2 => 'IGMP',
+  6 => 'TCP',
+  17 => 'UDP',
+  41 => 'IPv6',
+  50 => 'ESP',
+  51 => 'AH',
+  58 => 'ICMPv6',
+  89 => 'OSPF'
+}
+
+
+# Function to convert flag value to a hash
+def get_tcp_flags_hash(flags, tcp_flags)
+  tcp_flags.each_with_object({}) do |(flag, name), hash|
+    hash[name] = (flags & flag != 0)
+  end
+end
+
+def protocol_number(pkt)
+  return pkt.ip.protocol
+end
+
+def binary_data?(data)
+  return data.bytes.any? { |byte| byte < 32 || byte > 126 }
+end
+
+def pkt_flags(pkt)
+
+  # Mapping of TCP flag values to their corresponding names
+  tcp_flags = {
+    0x01 => 'FIN',
+    0x02 => 'SYN',
+    0x04 => 'RST',
+    0x08 => 'PSH',
+    0x10 => 'ACK',
+    0x20 => 'URG',
+    0x40 => 'ECE',
+    0x80 => 'CWR'
+  }
+
+  # Get the TCP flags from the packet
+  tcp_flag_value = pkt.tcp.flags
+
+  # Convert the TCP flags to a hash
+  tcp_flags_hash = get_tcp_flags_hash(tcp_flag_value, tcp_flags)
+
+  split_point = tcp_flags_hash.keys.length
+   
+  # Define the split points
+  split1 = split_point / 2
+  split2 = split_point
+
+  # Create two new hashes based on the split keys
+  tcp_flags_part1 = tcp_flags_hash.select.with_index { |(_, _), i| i < split1 }
+  tcp_flags_part2 = tcp_flags_hash.select.with_index { |(_, _), i| i >= split1 && i < split2 }
+ 
+  # Convert each part to pretty-printed JSON
+  pretty_json_part1 = JSON.pretty_generate(tcp_flags_part1)
+  pretty_json_part2 = JSON.pretty_generate(tcp_flags_part2)
+
+  html_output pretty_json_part1, :brown
+  html_output pretty_json_part2, :brown
+
+end
+
+
+
+def print_organization_name_for_unreselved_ip(ip_address)
+  # Run the whois command and capture the output
+  stdout, stderr, status = Open3.capture3("whois #{ip_address}")
+
+  if status.success?
+    organization = stdout.match(/OrgName:\s*(.*)/)
+    country = stdout.match(/Country:\s*(.*)/)
+    if organization
+      html_output "Organization: #{organization[1]}", :black
+    else
+      html_output "Organization information not found.", :black
+    end
+    if country
+      html_output "Country: #{country[1]}", :black
+    else
+      html_output "Country information not found.", :black
+    end
+  else
+    html_output "Error: #{stderr}", :red
+  end
+  html_output "====================", :grey
+end
+
+def print_body(body)
+# Access and print the payload content
+  if body == ""
+    html_output "Payload is Empty", :green
+  else  
+    if binary_data?(body)
+      encoded_payload = Base64.encode64(body)
+      html_output "Payload: #{encoded_payload}", :green
+    else
+      html_output "Payload: #{body}", :green
+    end
+  end
+end
+
+
 # Run the packet capturing in a separate thread
 Thread.new do
   # Capture packets on the specified network interface
   begin
     PacketGen.capture(iface: iface, promisc: true) do |pkt|
+      
       if pkt.is?('IP')
+
         ip_src = pkt.ip.src.to_s
         ip_dst = pkt.ip.dst.to_s
 
@@ -125,9 +237,32 @@ Thread.new do
           else
             if hostname.nil?
               hostname = resolve_hostname(ip_src)
-              html_output("Unknown incoming traffic from: #{ip_src}", :red)
-            else
+              
+              protocol = protocol_number(pkt)
+              
+              # Get the protocol name from the mapping
+              protocol_name = protocol_names[protocol] || "Unknown Protocol (#{protocol})"
+           
+              # Generate a packet and convert it to binary
+              binary_packet = pkt.to_s
+              # Access and print the source and destination ports
+              html_output "====================", :grey
+              html_output "Source Port: #{pkt.tcp.sport}, Destination Port: #{pkt.tcp.dport}", :blue 
+              
+              # Print the size of the packet
+              html_output "Packet Size: #{binary_packet.size} bytes", :orange
+             
+              print_body(pkt.tcp.body)
+            
+              pkt_flags(pkt)
+
+              html_output("#{protocol_name} : Unknown incoming traffic from: #{ip_src} addressed to #{ip_dst}", :red)
+
+              print_organization_name_for_unreselved_ip(ip_src)
+          
               #html_output("Incoming traffic from: #{hostname} (#{ip_src})", :blue)
+
+              #puts pkt.inspect
             end
           end
         end
