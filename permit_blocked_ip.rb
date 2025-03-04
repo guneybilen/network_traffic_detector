@@ -52,5 +52,4 @@ def permit_ip(ip)
 end
 
 # Example usage to permit an IP address
-ip_to_permit = '20.189.173.4'
 permit_ip(ip_to_permit)

@@ -5,31 +5,20 @@ require 'webrick'
 require 'json'
 require 'base64'
 require 'open3'
+
+# file for mac to block an ip address
 require_relative "block_an_ip"
 
+# file for mac to permit an ip address
+require_relative "permit_blocked_ip"
+
 def html_output(txt_output, txt_color, ip_src = nil)
+  # Define the JavaScript function in the global scope
+
   if ip_src
     output = <<-HTML
     <p style='color: #{txt_color}'>#{txt_output}</p>
-    <li>You want to block this IP? Just click on it <a href="#" ondblclick="sendIp('#{ip_src}')">#{ip_src}</a></li>
-    <script>
-      function sendIp(ip) {
-        fetch('/handle_ip', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ ip: ip })
-        })
-        .then(response => response.text())
-        .then(data => {
-          console.log('Response from server:', data);
-        })
-        .catch(error => {
-          console.error('Error:', error);
-        });
-      }
-    </script>
+    <li>You want to block this IP? Just click on it <a href="#" ondblclick="blockIp('#{ip_src}')">#{ip_src}</a></li>
 HTML
   else
       output = <<-HTML
@@ -37,6 +26,21 @@ HTML
 HTML
   end
     
+    # Append the HTML content to a file
+    File.open('content.html', 'a') { |file| file.write(output) }
+end
+
+
+def get_ip_address
+  # Iterate through all network interfaces
+  Socket.ip_address_list.each do |addr_info|
+    # Skip loopback addresses
+    next if addr_info.ipv4_loopback? || addr_info.ipv6_loopback?
+
+    # Return the non-loopback IPv4 address
+    return addr_info.ip_address if addr_info.ipv4?
+  end    
+
     # Append the HTML content to a file
     File.open('content.html', 'a') { |file| file.write(output) }
 end
@@ -300,17 +304,54 @@ class IPHandler < WEBrick::HTTPServlet::AbstractServlet
   def do_POST(req, res)
     data = JSON.parse(req.body)
     ip_address = data['ip']
-
-    # Process the IP address as needed
-    # For example, log the IP address or block it using the previous pf method
-
-    puts "Received IP: #{ip_address}"
-    block_ip(ip_address)
     
+    # this method calls a file in this folder that modifies mac firewall.
+    # block_ip(ip_address)
+
+    # Check if the IP already exists in the file
+    file_path = 'blockedIps.txt'
+    existing_ips = []
+
+    # Read existing IPs from the file if it exists
+    if File.exist?(file_path)
+      existing_ips = File.readlines(file_path).map(&:chomp)
+    end
+
+    if existing_ips.include?(ip_address)
+      puts "IP address #{ip_address} is already blocked."
+    else
+      File.open('blockedIps.txt', 'a') do |file|
+        file.puts(ip_address)
+      end
+      puts "IP address #{ip_address} has been blocked."
+    end
+      res.status = 200
+      res['Content-Type'] = 'application/json'
+      res.body = { status: 'success', block_ip_address: ip_address }.to_json
+
+  end
+
+  def do_DELETE(req, res)
+    data = JSON.parse(req.body)
+    ip_address = data['ip']
+  
+    # this method calls a file in this folder that modifies mac firewall.
+    # permit_ip(ip_address)
+
+    # Read the content of blocked_ips.txt
+    blocked_ips_content = File.read("blockedIps.txt").split("\n")
+  
+    # Remove the IP address entry from the content
+    updated_content = blocked_ips_content.reject { |line| line.strip == ip_address }
+  
+    # Write the updated content back to blocked_ips.txt
+    File.open('blockedIps.txt', 'w') { |file| file.puts(updated_content) }
+  
     res.status = 200
     res['Content-Type'] = 'application/json'
-    res.body = { status: 'success', received_ip: ip_address }.to_json
+    res.body = { status: 'success', permit_ip_address: ip_address }.to_json
   end
+  
 end
 
 server = WEBrick::HTTPServer.new(Port: 8000, DocumentRoot: Dir.pwd)
@@ -318,11 +359,30 @@ server = WEBrick::HTTPServer.new(Port: 8000, DocumentRoot: Dir.pwd)
 # Serve the HTML file
 server.mount_proc '/' do |req, res|
   res.content_type = 'text/html'
+  res.body = File.read('index.html')
+end
+
+# Add route to serve content.html
+server.mount_proc '/content.html' do |req, res|
+  res.content_type = 'text/html'
   res.body = File.read('content.html')
 end
 
+# Add route to serve content.html
+server.mount_proc '/blocked_ips.html' do |req, res|
+  res.content_type = 'text/html'
+  res.body = File.read('blocked_ips.html')
+end
+
+server.mount_proc '/blockedIps.txt' do |req, res|
+  res.content_type = 'text/plain'
+  res.body = File.read('blockedIps.txt')
+end
+
 # Mount the IPHandler servlet to handle POST requests
-server.mount '/handle_ip', IPHandler
+server.mount '/block_ip', IPHandler
+
+#server.mount '/permit_ip', IPHandler
 
 # Signal handler to clear content.html on Ctrl+C
 Signal.trap("INT") do

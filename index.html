@@ -9,30 +9,173 @@
   <title>Network Traffic Output</title>
   <style>
     :root {
-      --font-size: 16px;
+      --font-size: 12px;    
     }
     #content {
       height: 90vh;
       overflow-y: scroll;
+
+    } 
+
+    p{
+      font-size: 10px;
+    }
+
+    div#heading {
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: 17%;
+        background-color: #f1f1f1;
+        padding: 10px;
+        text-align: center;
+        border-bottom: 1px solid #ccc;
+        z-index: 1;
+    }
+
+    div#blockedIp {
+      position: fixed;
+      top: 90px; /* Adjust this value to match the height of the heading */
+      right: 0;
+      width: 17%; /* Match width to align with the heading */
+      height: calc(100% - 50px); /* Adjust height to exclude the heading's height */
+      border: none;
+      z-index: 2;
+      background-color: white; /* Optional: for visual clarity */
+    }
+
+  .flash-message {
+    font-weight: bold;
+    color: black; /* Initial highlight background color */
+    animation: highlight-fade 5s forwards;
+  }
+
+  @keyframes highlight-fade {
+    0% {
+      color: red;
+      font-weight: bold;
+
+    }
+    100% {
+      color: blue; /* Transition to normal background color */
+      font-weight: normal;     /* Transition to normal font weight */
+    }  
+  }
+    body {
+        margin-right: 20%;
     }
   </style>
   <script>
+    async function blockIp(ip) {
+      try {
+        // Send the IP address to the backend
+        const response = await fetch('/block_ip', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+        },
+          body: JSON.stringify({ ip: ip })
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success' && result.block_ip_address) {
+          fetchBlockedIPs()
+        } else {
+          console.error('Failed to add blocked IP:', result);
+        }
+      } catch (error) {
+        console.error('Error while adding blocked IP:', error);
+      }
+    }
+
+    async function permitIp(ip) {
+      try {
+        // Send the IP address to the backend
+        const response = await fetch('/block_ip', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json'
+        },
+          body: JSON.stringify({ ip: ip })
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success' && result.permit_ip_address) {
+          fetchBlockedIPs("permit")
+        } else {
+          console.error('Failed to add blocked IP:', result);
+        }
+      } catch (error) {
+        console.error('Error while adding blocked IP:', error);
+      }
+    }
+
+
+    // Function to fetch and display the contents of blocked_ips.txt
+  async function fetchBlockedIPs(for_highlight_omit = "none") {
+    try {
+      const response = await fetch('/blockedIps.txt'); // Adjust the path if necessary
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      const data = await response.text(); // Get the file content as plain text
+      const ips = data.split('\n').filter(ip => ip.trim() !== ''); // Split into lines and remove empty entries
+
+      // Get the container to display the IPs
+      const container = document.getElementById('blockedIp');
+      container.innerHTML = ''; // Clear existing content
+
+      // Add each IP to the container
+      ips.reverse().forEach((ip, index) => {
+        const ipElement = document.createElement('p');
+        ipElement.textContent = ip;
+         // Add CSS styles dynamically
+        ipElement.style.color = 'blue';
+        ipElement.style.cursor = 'pointer';
+        ipElement.style.margin = '10px 0';
+        index == 0 && for_highlight_omit === "none" ? ipElement.className = "flash-message" : ""
+        ipElement.ondblclick = () => {
+            permitIp(ip);
+        };
+
+        container.appendChild(ipElement);
+
+      });
+    } catch (error) {
+      console.error('Error fetching blocked IPs:', error);
+      document.getElementById('blockedIpsContainer').textContent = 'Failed to load blocked IPs.';
+    }
+  }
+
+  // Call the function when the page loads
+  fetchBlockedIPs();
+
     // Fetch new content every second
     setInterval(() => {
-      fetch('content.html')
+      fetch('./content.html')
         .then(response => response.text())
         .then(data => {
+          
           // Clear and reload the content
           const contentDiv = document.getElementById('content');
           contentDiv.innerHTML = data;
 
           // Scroll to the bottom of the content div
           contentDiv.scrollTop = contentDiv.scrollHeight;
-        });
-    }, 3000); // Refresh every three second
+        })
+        .catch(error => console.error('Error fetching content.html:', error));
+    }, 1000);
   </script>
 </head>
 <body>
-  <div id='content'></div>
+  <div id="content"></div>
+  <div id="heading">Blocked IPs List
+    <p><b>double click to permit again</b></p>
+  </div>
+  <div id="blockedIp">
+  </div>
 </body>
 </html>
