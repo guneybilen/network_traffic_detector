@@ -5,12 +5,37 @@ require 'webrick'
 require 'json'
 require 'base64'
 require 'open3'
+require_relative "block_an_ip"
 
-
-def html_output(txt_output, txt_color)
+def html_output(txt_output, txt_color, ip_src = nil)
+  if ip_src
     output = <<-HTML
     <p style='color: #{txt_color}'>#{txt_output}</p>
+    <li>You want to block this IP? Just click on it <a href="#" ondblclick="sendIp('#{ip_src}')">#{ip_src}</a></li>
+    <script>
+      function sendIp(ip) {
+        fetch('/handle_ip', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ ip: ip })
+        })
+        .then(response => response.text())
+        .then(data => {
+          console.log('Response from server:', data);
+        })
+        .catch(error => {
+          console.error('Error:', error);
+        });
+      }
+    </script>
 HTML
+  else
+      output = <<-HTML
+      <p style='color: #{txt_color}'>#{txt_output}</p>
+HTML
+  end
     
     # Append the HTML content to a file
     File.open('content.html', 'a') { |file| file.write(output) }
@@ -71,12 +96,6 @@ outgoing_destinations = {}
 # Router address
 router_address = '192.168.1.1'
 
-# Start the WEBrick server
-server = WEBrick::HTTPServer.new(
-  Port: 8000,
-  DocumentRoot: Dir.pwd,
-)
-
 # Define a custom HTTP servlet with CORS support
 class CORSHandler < WEBrick::HTTPServlet::FileHandler
   def do_GET(request, response)
@@ -94,8 +113,6 @@ class CORSHandler < WEBrick::HTTPServlet::FileHandler
   end
 end
 
-# Mount the root directory with the custom CORS handler
-server.mount('/', CORSHandler, Dir.pwd)
 
 # Mapping of protocol numbers to protocol names
 protocol_names = {
@@ -246,7 +263,7 @@ Thread.new do
               # Generate a packet and convert it to binary
               binary_packet = pkt.to_s
               # Access and print the source and destination ports
-              html_output "====================", :grey
+              
               html_output "Source Port: #{pkt.tcp.sport}, Destination Port: #{pkt.tcp.dport}", :blue 
               
               # Print the size of the packet
@@ -256,7 +273,7 @@ Thread.new do
             
               pkt_flags(pkt)
 
-              html_output("#{protocol_name} : Unknown incoming traffic from: #{ip_src} addressed to #{ip_dst}", :red)
+              html_output("#{protocol_name} : Unknown incoming traffic from: #{ip_src} addressed to #{ip_dst}", :red, ip_src)
 
               print_organization_name_for_unreselved_ip(ip_src)
           
@@ -278,6 +295,34 @@ Thread.new do
     $stderr = original_stderr
   end
 end
+
+class IPHandler < WEBrick::HTTPServlet::AbstractServlet
+  def do_POST(req, res)
+    data = JSON.parse(req.body)
+    ip_address = data['ip']
+
+    # Process the IP address as needed
+    # For example, log the IP address or block it using the previous pf method
+
+    puts "Received IP: #{ip_address}"
+    block_ip(ip_address)
+    
+    res.status = 200
+    res['Content-Type'] = 'application/json'
+    res.body = { status: 'success', received_ip: ip_address }.to_json
+  end
+end
+
+server = WEBrick::HTTPServer.new(Port: 8000, DocumentRoot: Dir.pwd)
+
+# Serve the HTML file
+server.mount_proc '/' do |req, res|
+  res.content_type = 'text/html'
+  res.body = File.read('content.html')
+end
+
+# Mount the IPHandler servlet to handle POST requests
+server.mount '/handle_ip', IPHandler
 
 # Signal handler to clear content.html on Ctrl+C
 Signal.trap("INT") do
