@@ -7,10 +7,10 @@ require 'base64'
 require 'open3'
 
 # file for mac to block an ip address
-require_relative "block_an_ip"
+#require_relative "block_an_ip"
 
 # file for mac to permit an ip address
-require_relative "permit_blocked_ip"
+# require_relative "permit_blocked_ip"
 
 def html_output(txt_output, txt_color, ip_src = nil)
   # Define the JavaScript function in the global scope
